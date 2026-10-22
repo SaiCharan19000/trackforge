@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { UserProfile, UserRole } from '../../types';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
+import { Modal } from '../common/Modal';
 import { formatDate, getInitials } from '../../utils/formatters';
-import { Search, Shield, UserCheck, UserX } from 'lucide-react';
+import { Search, Shield, UserCheck, UserX, UserPlus } from 'lucide-react';
 
 interface UserManagementTableProps {
   users: UserProfile[];
   onRoleChange: (userId: string, role: UserRole) => Promise<void>;
   onToggleStatus: (userId: string, isActive: boolean) => Promise<void>;
+  onAddUser?: (data: { full_name: string; email: string; role: UserRole }) => Promise<void>;
   currentAdminId?: string;
 }
 
@@ -16,11 +18,20 @@ export const UserManagementTable: React.FC<UserManagementTableProps> = ({
   users,
   onRoleChange,
   onToggleStatus,
+  onAddUser,
   currentAdminId
 }) => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Add User Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState<UserRole>('team_member');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const filtered = users.filter(u => {
     const matchesSearch =
@@ -48,6 +59,33 @@ export const UserManagementTable: React.FC<UserManagementTableProps> = ({
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim() || !newEmail.trim()) {
+      setFormError('Please enter both name and email.');
+      return;
+    }
+    setFormError(null);
+    setIsSubmitting(true);
+    try {
+      if (onAddUser) {
+        await onAddUser({
+          full_name: newName.trim(),
+          email: newEmail.trim(),
+          role: newRole
+        });
+      }
+      setIsAddModalOpen(false);
+      setNewName('');
+      setNewEmail('');
+      setNewRole('team_member');
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to create user');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="card" style={{ padding: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -59,6 +97,17 @@ export const UserManagementTable: React.FC<UserManagementTableProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {onAddUser && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<UserPlus size={15} />}
+              onClick={() => setIsAddModalOpen(true)}
+            >
+              Add User
+            </Button>
+          )}
+
           <select
             className="form-select"
             value={roleFilter}
@@ -204,6 +253,98 @@ export const UserManagementTable: React.FC<UserManagementTableProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Add User Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setFormError(null);
+        }}
+        title="Add New User"
+        maxWidth="480px"
+      >
+        <form onSubmit={handleCreateUser}>
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            {formError && (
+              <div
+                style={{
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  color: 'var(--accent-rose)',
+                  fontSize: '0.8125rem'
+                }}
+              >
+                {formError}
+              </div>
+            )}
+
+            <div>
+              <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.8125rem', fontWeight: 600 }}>
+                Full Name *
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                required
+                placeholder="e.g. John Doe"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.8125rem', fontWeight: 600 }}>
+                Email Address *
+              </label>
+              <input
+                type="email"
+                className="form-input"
+                required
+                placeholder="e.g. john@trackforge.io"
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.8125rem', fontWeight: 600 }}>
+                System Role *
+              </label>
+              <select
+                className="form-select"
+                value={newRole}
+                onChange={e => setNewRole(e.target.value as UserRole)}
+              >
+                <option value="team_member">Team Member (Contribute to assigned tasks)</option>
+                <option value="project_manager">Project Manager (Create & manage projects)</option>
+                <option value="admin">System Admin (Full unrestricted control)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setIsAddModalOpen(false);
+                setFormError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isSubmitting}
+            >
+              Create User
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

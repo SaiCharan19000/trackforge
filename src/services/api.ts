@@ -710,6 +710,41 @@ export const api = {
     return demoUsers;
   },
 
+  async createUser(
+    data: { full_name: string; email: string; role: UserRole },
+    actor: UserProfile
+  ): Promise<UserProfile> {
+    const existing = demoUsers.find(u => u.email.toLowerCase() === data.email.toLowerCase());
+    if (existing) {
+      throw new Error(`User with email "${data.email}" already exists.`);
+    }
+
+    if (isSupabaseConfigured) {
+      const { data: created, error } = await supabase.from('profiles').insert({
+        email: data.email,
+        full_name: data.full_name,
+        role: data.role,
+        is_active: true
+      }).select().single();
+      if (error) throw new Error(error.message);
+      recordActivity('User Created', actor, undefined, undefined, { user_name: data.full_name, role: data.role });
+      return created;
+    }
+
+    const newUser: UserProfile = {
+      id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      email: data.email,
+      full_name: data.full_name,
+      role: data.role,
+      is_active: true,
+      created_at: new Date().toISOString()
+    };
+    demoUsers = [newUser, ...demoUsers];
+    saveStorage(STORAGE_KEYS.USERS, demoUsers);
+    recordActivity('User Created', actor, undefined, undefined, { user_name: data.full_name, role: data.role });
+    return newUser;
+  },
+
   async updateUserRole(userId: string, role: UserRole, actor: UserProfile): Promise<void> {
     if (isSupabaseConfigured) {
       const { error } = await supabase.from('profiles').update({ role }).eq('id', userId);

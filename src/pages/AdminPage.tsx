@@ -66,6 +66,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     });
   };
 
+  const handleAddUser = async (data: { full_name: string; email: string; role: UserRole }) => {
+    if (!user) return;
+    const created = await api.createUser(data, user);
+    await loadUsers();
+    addToast({
+      type: 'success',
+      title: 'User Created',
+      message: `${created.full_name} has been added as ${created.role.replace('_', ' ')}.`
+    });
+  };
+
   const totalAdmins = users.filter(u => u.role === 'admin').length;
   const totalPMs = users.filter(u => u.role === 'project_manager').length;
   const totalMembers = users.filter(u => u.role === 'team_member').length;
@@ -131,6 +142,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           currentAdminId={user.id}
           onRoleChange={handleRoleChange}
           onToggleStatus={handleToggleStatus}
+          onAddUser={handleAddUser}
         />
       )}
 
